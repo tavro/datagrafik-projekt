@@ -8,92 +8,35 @@
 
 #include <math.h>
 
-GLfloat vertices[36*3] = {
-	-0.5,-0.5,-0.5,	// 0
-	-0.5,0.5,-0.5,	// 3
-	0.5,0.5,-0.5,	// 2
-	-0.5,-0.5,-0.5,	// 0
-	0.5,0.5,-0.5,	// 2
-	0.5,-0.5,-0.5,	// 1
-
-	0.5,0.5,-0.5,	// 2
-	-0.5,0.5,-0.5,	// 3
-	-0.5,0.5,0.5,	// 7
-	0.5,0.5,-0.5,	// 2
-	-0.5,0.5,0.5,	// 7
-	0.5,0.5,0.5,	// 6
-
-	-0.5,-0.5,-0.5,	// 0
-	-0.5,-0.5,0.5,	// 4
-	-0.5,0.5,0.5,	// 7
-	-0.5,-0.5,-0.5,	// 0
-	-0.5,0.5,0.5,	// 7
-	-0.5,0.5,-0.5,	// 3
-
-	0.5,-0.5,-0.5,	// 1
-	0.5,0.5,-0.5,	// 2
-	0.5,0.5,0.5,	// 6
-	0.5,-0.5,-0.5,	// 1
-	0.5,0.5,0.5,	// 6
-	0.5,-0.5,0.5,	// 5
-
-	-0.5,-0.5,0.5,	// 4
-	0.5,-0.5,0.5,	// 5
-	0.5,0.5,0.5,	// 6
-	-0.5,-0.5,0.5,	// 4
-	0.5,0.5,0.5,	// 6
-	-0.5,0.5,0.5,	// 7
-
-	-0.5,-0.5,-0.5,	// 0
-	0.5,-0.5,-0.5,	// 1
-	0.5,-0.5,0.5,	// 5
-	-0.5,-0.5,-0.5,	// 0
-	0.5,-0.5,0.5,	// 5
-	-0.5,-0.5,0.5	// 4						
+GLfloat vertices[8*3] = {
+	-0.5, -0.5, -0.5,	// 0
+	 0.5, -0.5, -0.5,	// 1
+	 0.5,  0.5, -0.5,	// 2
+	-0.5,  0.5, -0.5,	// 3
+	-0.5, -0.5,  0.5,	// 4
+	 0.5, -0.5,  0.5,	// 5
+	 0.5,  0.5,  0.5,	// 6
+	-0.5,  0.5,  0.5,	// 7
 };
 
-GLfloat colors[36*3] = {
-	1.0, 0.0, 0.0,	// Red
-	1.0, 0.0, 0.0,	// Red
-	1.0, 0.0, 0.0,	// Red
-	1.0, 0.0, 0.0,	// Red
-	1.0, 0.0, 0.0,	// Red
-	1.0, 0.0, 0.0,	// Red
+GLubyte indices[36] = {
+	0, 3, 2, 0, 2, 1,	// Face 1
+	2, 3, 7, 2, 7, 6,	// Face 2
+	0, 4, 7, 0, 7, 3, 	// Face 3
+	1, 2, 6, 1, 6, 5,	// Face 4
+	4, 5, 6, 4, 6, 7,	// Face 5
+	0, 1, 5, 0, 5, 4	// Face 6
+};
 
+GLfloat colors[8*3] = {
+	1.0, 0.0, 0.0,	// Red
 	0.0, 1.0, 0.0,	// Green
-	0.0, 1.0, 0.0,	// Green
-	0.0, 1.0, 0.0,	// Green
-	0.0, 1.0, 0.0,	// Green
-	0.0, 1.0, 0.0,	// Green
-	0.0, 1.0, 0.0,	// Green
-
 	0.0, 0.0, 1.0,	// Blue
-	0.0, 0.0, 1.0,	// Blue
-	0.0, 0.0, 1.0,	// Blue
-	0.0, 0.0, 1.0,	// Blue
-	0.0, 0.0, 1.0,	// Blue
-	0.0, 0.0, 1.0,	// Blue
-
 	0.0, 1.0, 1.0,	// Cyan
-	0.0, 1.0, 1.0,	// Cyan
-	0.0, 1.0, 1.0,	// Cyan
-	0.0, 1.0, 1.0,	// Cyan
-	0.0, 1.0, 1.0,	// Cyan
-	0.0, 1.0, 1.0,	// Cyan
-
 	1.0, 0.0, 1.0,	// Magenta
-	1.0, 0.0, 1.0,	// Magenta
-	1.0, 0.0, 1.0,	// Magenta
-	1.0, 0.0, 1.0,	// Magenta
-	1.0, 0.0, 1.0,	// Magenta
-	1.0, 0.0, 1.0,	// Magenta
-
 	1.0, 1.0, 0.0,	// Yellow
-	1.0, 1.0, 0.0,	// Yellow
-	1.0, 1.0, 0.0,	// Yellow
-	1.0, 1.0, 0.0,	// Yellow
-	1.0, 1.0, 0.0,	// Yellow
-	1.0, 1.0, 0.0,	// Yellow
+	1.0, 1.0, 1.0,	// White
+	0.0, 0.0, 0.0,	// Black
 };
 
 GLfloat rotationMatrix[] = {
@@ -136,6 +79,7 @@ GLuint program;
 void init(void)
 {
 	unsigned int vertexBufferObjID;
+	unsigned int indexBufferObjID;
 	unsigned int colorBufferObjID;
 
 	dumpInfo();
@@ -152,17 +96,21 @@ void init(void)
 	glBindVertexArray(vertexArrayObjID);
 
 	glGenBuffers(1, &vertexBufferObjID);
+	glGenBuffers(1, &indexBufferObjID);
 	glGenBuffers(1, &colorBufferObjID);
 
 	glBindBuffer(GL_ARRAY_BUFFER, vertexBufferObjID);
-	glBufferData(GL_ARRAY_BUFFER, 36*3*sizeof(GLfloat), vertices, GL_STATIC_DRAW);
-	glVertexAttribPointer(glGetAttribLocation(program, "in_Position"), 3, GL_FLOAT, GL_FALSE, 0, 0); 
+	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+	glVertexAttribPointer(glGetAttribLocation(program, "in_Position"), 3, GL_FLOAT, GL_FALSE, 0, 0);
 	glEnableVertexAttribArray(glGetAttribLocation(program, "in_Position"));
-
+	
 	glBindBuffer(GL_ARRAY_BUFFER, colorBufferObjID);
-	glBufferData(GL_ARRAY_BUFFER, 36*3*sizeof(GLfloat), colors, GL_STATIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(colors), colors, GL_STATIC_DRAW);
 	glVertexAttribPointer(glGetAttribLocation(program, "in_Color"), 3, GL_FLOAT, GL_FALSE, 0, 0);
 	glEnableVertexAttribArray(glGetAttribLocation(program, "in_Color"));
+	
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBufferObjID);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
 
 	glUniformMatrix4fv(glGetUniformLocation(program, "translationMatrix"), 1, GL_TRUE, translationMatrix);
 	glUniformMatrix4fv(glGetUniformLocation(program, "rotationMatrix"), 1, GL_TRUE, rotationMatrix);
@@ -193,8 +141,8 @@ void display(void)
 	glUniformMatrix4fv(glGetUniformLocation(program, "rotationMatrix"), 1, GL_TRUE, rotationMatrix);
 
 	glBindVertexArray(vertexArrayObjID);
-	glDrawArrays(GL_TRIANGLES, 0, 36*3);
-
+	glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_BYTE, 0);
+	
 	printError("display");
 	
 	glutSwapBuffers();
