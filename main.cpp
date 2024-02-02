@@ -193,6 +193,8 @@ void updateVertexPositions() {
 	}
 }
 
+int selectedVertexIndex = -1;
+
 float angle = 0.0f;
 float speed = 0.05f;
 void display(void)
@@ -232,18 +234,54 @@ void display(void)
     glDrawElements(GL_LINES, 24, GL_UNSIGNED_BYTE, 0);
 
 	// draw vertices as points
-    glPointSize(10.0f);
-    GLfloat pointColor[3] = {1.0, 0.5, 0.0};
-    glUniform1i(glGetUniformLocation(program, "useUniformColor"), GL_TRUE);
-    glUniform3fv(glGetUniformLocation(program, "uniformColor"), 1, pointColor);
-    glDrawArrays(GL_POINTS, 0, 8);
-
+	for (int i = 0; i < 8; ++i) {
+		if (i == selectedVertexIndex) {
+			glPointSize(20.0f);
+			GLfloat selectedColor[3] = {1.0, 0.0, 0.0};
+			glUniform3fv(glGetUniformLocation(program, "uniformColor"), 1, selectedColor);
+		} else {
+			glPointSize(10.0f);
+			GLfloat pointColor[3] = {1.0, 0.5, 0.0};
+			glUniform3fv(glGetUniformLocation(program, "uniformColor"), 1, pointColor);
+		}
+		glDrawArrays(GL_POINTS, i, 1);
+	}
     glUniform1i(glGetUniformLocation(program, "useUniformColor"), GL_FALSE);
 
     printError("display");
     
     glutSwapBuffers();
 }
+
+void mouse(int button, int state, int x, int y) { // TODO: this function does not work as supposed to
+    if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN) {
+        float screenWidth = glutGet(GLUT_WINDOW_WIDTH);
+        float screenHeight = glutGet(GLUT_WINDOW_HEIGHT);
+        
+        float ndcX = (x / screenWidth) * 2.0f - 1.0f;
+        float ndcY = 1.0f - (y / screenHeight) * 2.0f;
+
+        float clickedWorldX = ndcX;
+        float clickedWorldY = ndcY;
+        float clickedWorldZ = 0;
+		
+        float minDistance = std::numeric_limits<float>::max();
+        int closestVertexIndex = -1;
+
+        for (int i = 0; i < 8; ++i) {
+            float vertexX, vertexY, vertexZ;
+            getCurrentVertexPosition(i, &vertexX, &vertexY, &vertexZ);
+            float distance = sqrt(pow(vertexX - clickedWorldX, 2) + pow(vertexY - clickedWorldY, 2) + pow(vertexZ - clickedWorldZ, 2));
+            if (distance < minDistance) {
+                minDistance = distance;
+                closestVertexIndex = i;
+            }
+        }
+
+        selectedVertexIndex = closestVertexIndex;
+    }
+}
+
 
 int main(int argc, char *argv[])
 {
@@ -254,6 +292,7 @@ int main(int argc, char *argv[])
 	glutCreateWindow ("Mixer");
 	glutRepeatingTimer(20);
 	glutDisplayFunc(display); 
+	glutMouseFunc(mouse);
 	init ();
 	glutMainLoop();
 
