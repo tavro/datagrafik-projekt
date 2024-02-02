@@ -39,6 +39,12 @@ GLfloat colors[8*3] = {
 	0.0, 0.0, 0.0,	// Black
 };
 
+GLubyte lineIndices[8*3] = {
+	0, 1, 1, 2, 2, 3, 3, 0, // Bottom face
+    4, 5, 5, 6, 6, 7, 7, 4, // Top face
+    0, 4, 1, 5, 2, 6, 3, 7  // Side edges
+};
+
 GLfloat rotationMatrix[] = {
 	1.0f, 0.0f, 0.0f, 0.0f,
 	0.0f, 1.0f, 0.0f, 0.0f,
@@ -76,10 +82,11 @@ GLfloat projectionMatrix[] = {
 unsigned int vertexArrayObjID;
 GLuint program;
 
+unsigned int indexBufferObjID;
+unsigned int lineIndexBufferObjID;
 void init(void)
 {
 	unsigned int vertexBufferObjID;
-	unsigned int indexBufferObjID;
 	unsigned int colorBufferObjID;
 
 	dumpInfo();
@@ -98,6 +105,7 @@ void init(void)
 	glGenBuffers(1, &vertexBufferObjID);
 	glGenBuffers(1, &indexBufferObjID);
 	glGenBuffers(1, &colorBufferObjID);
+	glGenBuffers(1, &lineIndexBufferObjID);
 
 	glBindBuffer(GL_ARRAY_BUFFER, vertexBufferObjID);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
@@ -112,6 +120,9 @@ void init(void)
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBufferObjID);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
 
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, lineIndexBufferObjID);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(lineIndices), lineIndices, GL_STATIC_DRAW);
+
 	glUniformMatrix4fv(glGetUniformLocation(program, "translationMatrix"), 1, GL_TRUE, translationMatrix);
 	glUniformMatrix4fv(glGetUniformLocation(program, "rotationMatrix"), 1, GL_TRUE, rotationMatrix);
 	glUniformMatrix4fv(glGetUniformLocation(program, "projMatrix"), 1, GL_TRUE, projectionMatrix);
@@ -123,29 +134,44 @@ float angle = 0.0f;
 float speed = 0.05f;
 void display(void)
 {
-	printError("pre display");
-	angle += speed;
+    printError("pre display");
+    angle += speed;
 
-	// clear screen
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    // clear screen
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	rotationMatrix2[0] = cos(angle/5.0);
-	rotationMatrix2[1] = -sin(angle/5.0);
-	rotationMatrix2[4] = sin(angle/5.0);
-	rotationMatrix2[5] = cos(angle/5.0);
-	glUniformMatrix4fv(glGetUniformLocation(program, "rotationMatrix2"), 1, GL_TRUE, rotationMatrix2);
-	rotationMatrix[5] = cos(angle);
-	rotationMatrix[6] = -sin(angle);
-	rotationMatrix[9] = sin(angle);
-	rotationMatrix[10] = cos(angle);
-	glUniformMatrix4fv(glGetUniformLocation(program, "rotationMatrix"), 1, GL_TRUE, rotationMatrix);
+    rotationMatrix2[0] = cos(angle/5.0);
+    rotationMatrix2[1] = -sin(angle/5.0);
+    rotationMatrix2[4] = sin(angle/5.0);
+    rotationMatrix2[5] = cos(angle/5.0);
+    glUniformMatrix4fv(glGetUniformLocation(program, "rotationMatrix2"), 1, GL_TRUE, rotationMatrix2);
+    rotationMatrix[5] = cos(angle);
+    rotationMatrix[6] = -sin(angle);
+    rotationMatrix[9] = sin(angle);
+    rotationMatrix[10] = cos(angle);
+    glUniformMatrix4fv(glGetUniformLocation(program, "rotationMatrix"), 1, GL_TRUE, rotationMatrix);
 
-	glBindVertexArray(vertexArrayObjID);
-	glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_BYTE, 0);
-	
-	printError("display");
-	
-	glutSwapBuffers();
+    glBindVertexArray(vertexArrayObjID);
+    
+    // draw cube
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBufferObjID);
+    glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_BYTE, 0);
+
+    // setup line drawing
+    glUniform1i(glGetUniformLocation(program, "useUniformColor"), GL_TRUE);
+    GLfloat lineColor[3] = {0.0, 0.0, 0.0};
+    glUniform3fv(glGetUniformLocation(program, "uniformColor"), 1, lineColor);
+    glLineWidth(2.0f);
+
+    // draw lines
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, lineIndexBufferObjID);
+    glDrawElements(GL_LINES, 24, GL_UNSIGNED_BYTE, 0);
+
+    glUniform1i(glGetUniformLocation(program, "useUniformColor"), GL_FALSE);
+
+    printError("display");
+    
+    glutSwapBuffers();
 }
 
 int main(int argc, char *argv[])
