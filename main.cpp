@@ -167,6 +167,13 @@ void display(void)
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, lineIndexBufferObjID);
     glDrawElements(GL_LINES, 24, GL_UNSIGNED_BYTE, 0);
 
+	// draw vertices as points
+    glPointSize(10.0f);
+    GLfloat pointColor[3] = {1.0, 0.5, 0.0};
+    glUniform1i(glGetUniformLocation(program, "useUniformColor"), GL_TRUE);
+    glUniform3fv(glGetUniformLocation(program, "uniformColor"), 1, pointColor);
+    glDrawArrays(GL_POINTS, 0, 8);
+
     glUniform1i(glGetUniformLocation(program, "useUniformColor"), GL_FALSE);
 
     printError("display");
