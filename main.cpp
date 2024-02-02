@@ -6,7 +6,11 @@
 #include "LoadTGA.h"
 #include "VectorUtils4.h"
 
+#include <stdlib.h>
+#include <iostream>
 #include <math.h>
+#include <time.h>
+#include <random>
 
 GLfloat vertices[8*3] = {
 	-0.5, -0.5, -0.5,	// 0
@@ -28,15 +32,25 @@ GLubyte indices[36] = {
 	0, 1, 5, 0, 5, 4	// Face 6
 };
 
-GLfloat colors[8*3] = {
+/*
 	1.0, 0.0, 0.0,	// Red
 	0.0, 1.0, 0.0,	// Green
 	0.0, 0.0, 1.0,	// Blue
 	0.0, 1.0, 1.0,	// Cyan
 	1.0, 0.0, 1.0,	// Magenta
 	1.0, 1.0, 0.0,	// Yellow
+*/
+
+GLfloat colors[8*3] = {
+	
 	1.0, 1.0, 1.0,	// White
 	0.0, 0.0, 0.0,	// Black
+	1.0, 1.0, 1.0,	// White
+	0.0, 0.0, 0.0,	// Black
+	1.0, 1.0, 1.0,	// White
+	0.0, 0.0, 0.0,	// Black
+	1.0, 1.0, 1.0,	// White
+	0.0, 0.0, 0.0	// Black
 };
 
 GLubyte lineIndices[8*3] = {
@@ -84,9 +98,9 @@ GLuint program;
 
 unsigned int indexBufferObjID;
 unsigned int lineIndexBufferObjID;
+unsigned int vertexBufferObjID;
 void init(void)
 {
-	unsigned int vertexBufferObjID;
 	unsigned int colorBufferObjID;
 
 	dumpInfo();
@@ -130,10 +144,60 @@ void init(void)
 	printError("init arrays");
 }
 
+void getCurrentVertexPosition(int vertexIndex, float* x, float* y, float* z) {
+    if (vertexIndex < 0 || vertexIndex >= 8) {
+        printf("Vertex index out of bounds.\n");
+        return;
+    }
+    
+    int arrayIndex = vertexIndex * 3;
+    *x = vertices[arrayIndex];
+    *y = vertices[arrayIndex + 1];
+    *z = vertices[arrayIndex + 2];
+}
+
+void updateVertexPosition(int vertexIndex, float x, float y, float z) {
+    if (vertexIndex < 0 || vertexIndex >= 8) {
+        printf("Vertex index out of bounds.\n");
+        return;
+    }
+    
+    int arrayIndex = vertexIndex * 3;
+
+    vertices[arrayIndex] = x;
+    vertices[arrayIndex + 1] = y;
+    vertices[arrayIndex + 2] = z;
+
+    glBindBuffer(GL_ARRAY_BUFFER, vertexBufferObjID);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+}
+
+float generateRandomFloat(float range) {
+    static std::random_device rd;
+    static std::mt19937 gen(rd());
+    std::uniform_real_distribution<> dis(-range, range);
+    
+    return dis(gen);
+}
+
+void updateVertexPositions() {
+	for(int i = 0; i < 8; i++) {
+		float currentX, currentY, currentZ;
+		getCurrentVertexPosition(i, &currentX, &currentY, &currentZ);
+
+		float randomX = currentX + generateRandomFloat(0.0025f);
+		float randomY = currentY + generateRandomFloat(0.0025f);
+		float randomZ = currentZ + generateRandomFloat(0.0025f);
+
+		updateVertexPosition(i, randomX, randomY, randomZ);
+	}
+}
+
 float angle = 0.0f;
 float speed = 0.05f;
 void display(void)
 {
+	updateVertexPositions(); //debug purposes
     printError("pre display");
     angle += speed;
 
