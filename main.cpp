@@ -15,6 +15,10 @@
 #include <fstream>
 #include <cstdlib>
 #include <ctime> 
+#include <vector>
+#include <set>
+#include <utility>
+#include <algorithm>
 
 GLfloat colors[8*3];
 GLubyte indices[36];
@@ -45,21 +49,53 @@ void loadCubeData(const char* filename) {
     }
 }
 
-GLubyte lineIndices[8*3] = {
-	0, 1, 1, 2, 2, 3, 3, 0, // Bottom face
-	4, 5, 5, 6, 6, 7, 7, 4, // Top face
-	0, 4, 1, 5, 2, 6, 3, 7  // Side edges
+struct PairComparator {
+    bool operator() (const std::pair<GLubyte, GLubyte>& lhs, const std::pair<GLubyte, GLubyte>& rhs) const {
+        return lhs.first < rhs.first || (lhs.first == rhs.first && lhs.second < rhs.second);
+    }
 };
 
+std::vector<GLubyte> generateLineIndices(const GLubyte* triangleIndices, size_t numTriangleIndices) {
+    std::set<std::pair<GLubyte, GLubyte>, PairComparator> uniqueEdges;
+    
+    for (size_t i = 0; i < numTriangleIndices; i += 3) {
+        GLubyte a = triangleIndices[i];
+        GLubyte b = triangleIndices[i + 1];
+        GLubyte c = triangleIndices[i + 2];
+        
+        uniqueEdges.insert(std::minmax({a, b}));
+        uniqueEdges.insert(std::minmax({b, c}));
+        uniqueEdges.insert(std::minmax({c, a}));
+    }
+    
+    std::vector<GLubyte> lineIndices;
+    for (const auto& edge : uniqueEdges) {
+        lineIndices.push_back(edge.first);
+        lineIndices.push_back(edge.second);
+    }
+    
+    return lineIndices;
+}
+
+GLubyte lineIndices[36];
+GLfloat axisLinesColors[6*3];
 GLfloat axisLinesVertices[6*3];
-GLfloat axisLinesColors[6*3] = {
-	1.0f, 0.0f, 0.0f, // x color (Red)
-	1.0f, 0.0f, 0.0f,
-	0.0f, 1.0f, 0.0f, // y color (Green)
-	0.0f, 1.0f, 0.0f,
-	0.0f, 0.0f, 1.0f, // z color (Blue)
-	0.0f, 0.0f, 1.0f,
-};
+void loadAxisColorData(const char* filename) {
+	std::ifstream file(filename);
+
+    if (!file.is_open()) {
+        std::cerr << "Failed to open file: " << filename << std::endl;
+        return;
+    }
+
+	for (int i = 0; i < 6*3; ++i) {
+        file >> axisLinesColors[i];
+    }
+
+	file.close();
+}
+
+// TODO: Clean below this comment
 
 #include "constants.h"
 mat4 projectionMatrix = mat4(
@@ -86,20 +122,26 @@ float angle_x, angle_y, angle_z;
 
 int selectedVertexIndex = -1;
 
-unsigned int axisVertexBufferObjID
+unsigned int vertexArrayObjID;
+
+unsigned int axisVertexBufferObjID;
 unsigned int axisColorBufferObjID;
 unsigned int lineIndexBufferObjID;
 unsigned int vertexBufferObjID;
 unsigned int indexBufferObjID;
 unsigned int colorBufferObjID;
 
-unsigned int vertexArrayObjID;
-
 void init(void)
 {
 	dumpInfo();
 
 	loadCubeData("./data/cubeData.txt");
+	loadAxisColorData("./data/axisColorData.txt");
+
+	std::vector<GLubyte> idx = generateLineIndices(indices, 36);
+    for (size_t i = 0; i < idx.size(); ++i) {
+        lineIndices[i] = idx[i];
+    }
 
 	glClearColor(0.5f, 0.5f, 0.5f, 1.0f);
 	glEnable(GL_DEPTH_TEST);
@@ -271,11 +313,11 @@ void display(void)
 	glUniform1i(glGetUniformLocation(program, "useUniformColor"), GL_TRUE);
 	GLfloat lineColor[3] = {0.0, 0.0, 0.0};
 	glUniform3fv(glGetUniformLocation(program, "uniformColor"), 1, lineColor);
-	glLineWidth(2.0f);
 
 	// draw lines
+	glLineWidth(2.0f);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, lineIndexBufferObjID);
-	glDrawElements(GL_LINES, 24, GL_UNSIGNED_BYTE, 0);
+	glDrawElements(GL_LINES, 36, GL_UNSIGNED_BYTE, 0);
 
 	// draw vertices as points
 	for (int i = 0; i < 8; ++i) {
