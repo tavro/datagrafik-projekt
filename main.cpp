@@ -256,7 +256,16 @@ void display(void)
     glutSwapBuffers();
 }
 
-void screenToWorldCoordinates(float screenX, float screenY, float& worldX, float& worldY, float& worldZ) {
+struct Ray {
+    vec3 origin;
+    vec3 direction;
+};
+
+float length(const vec3& v) {
+    return sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
+}
+
+Ray createRayFromScreenCoordinates(int screenX, int screenY) {
     float screenWidth = glutGet(GLUT_WINDOW_WIDTH);
     float screenHeight = glutGet(GLUT_WINDOW_HEIGHT);
 
@@ -267,18 +276,19 @@ void screenToWorldCoordinates(float screenX, float screenY, float& worldX, float
     vec4 clipPos = inverse(projectionMatrix) * ndcPos;
     vec4 worldPos = inverse(viewToWorld) * clipPos;
 
-    worldX = worldPos.x / worldPos.w;
-    worldY = worldPos.y / worldPos.w;
-    worldZ = worldPos.z / worldPos.w;
+    vec3 rayOrigin = vec3(worldPos.x / worldPos.w, worldPos.y / worldPos.w, worldPos.z / worldPos.w);
+    vec3 rayDirection = normalize(rayOrigin - vec3(0.0f, 0.0f, 0.5f)); // camera position
+
+    return Ray{rayOrigin, rayDirection};
 }
 
 void mouse(int button, int state, int x, int y) {
     if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN) {
-        float worldX, worldY, worldZ;
-        screenToWorldCoordinates(x, y, worldX, worldY, worldZ);
+        Ray ray = createRayFromScreenCoordinates(x, y);
 
         float closestDistance = std::numeric_limits<float>::max();
         int closestVertexIndex = -1;
+
         for (int i = 0; i < 8; ++i) {
             float vertexWorldX, vertexWorldY, vertexWorldZ;
             getCurrentVertexPosition(i, &vertexWorldX, &vertexWorldY, &vertexWorldZ);
@@ -286,10 +296,20 @@ void mouse(int button, int state, int x, int y) {
             vec4 vertexPos = vec4(vertexWorldX, vertexWorldY, vertexWorldZ, 1.0f);
             vertexPos = mdlMatrix * vertexPos;
 
-            float distance = sqrt(pow(vertexPos.x - worldX, 2) + pow(vertexPos.y - worldY, 2) + pow(vertexPos.z - worldZ, 2));
-            if (distance < closestDistance) {
-                closestDistance = distance;
-                closestVertexIndex = i;
+            vec3 vertexPosition = vec3(vertexPos.x, vertexPos.y, vertexPos.z);
+
+            vec3 rayToVertex = vertexPosition - ray.origin;
+            float t = dot(rayToVertex, ray.direction);
+
+            if (t > 0) {
+                vec3 closestPoint = ray.origin + ray.direction * t;
+
+                float distance = length(closestPoint - vertexPosition);
+
+                if (distance < closestDistance) {
+                    closestDistance = distance;
+                    closestVertexIndex = i;
+                }
             }
         }
 
