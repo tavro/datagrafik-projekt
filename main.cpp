@@ -142,10 +142,10 @@ void init(void)
 
 	glUniformMatrix4fv(glGetUniformLocation(program, "camMatrix"), 1, GL_TRUE, viewToWorld.m);
 
-	rotationMatrix1 = Rx(generateRandomFloat(180.0f));
-	rotationMatrix2 = Ry(generateRandomFloat(180.0f));
-	rotationMatrix3 = Rz(generateRandomFloat(180.0f));
-	mdlMatrix = translationMatrix * rotationMatrix1 * rotationMatrix2 * rotationMatrix3;
+	//rotationMatrix1 = Rx(generateRandomFloat(180.0f));
+	//rotationMatrix2 = Ry(generateRandomFloat(180.0f));
+	//rotationMatrix3 = Rz(generateRandomFloat(180.0f));
+	mdlMatrix = translationMatrix;// * rotationMatrix1 * rotationMatrix2 * rotationMatrix3;
 	glUniformMatrix4fv(glGetUniformLocation(program, "mdlMatrix"), 1, GL_TRUE, mdlMatrix.m);
 	//glUniformMatrix4fv(glGetUniformLocation(program, "rotationMatrix"), 1, GL_TRUE, rotationMatrix);
 	glUniformMatrix4fv(glGetUniformLocation(program, "projMatrix"), 1, GL_TRUE, projectionMatrix.m);
@@ -165,6 +165,39 @@ void getCurrentVertexPosition(int vertexIndex, float* x, float* y, float* z) {
     *z = vertices[arrayIndex + 2];
 }
 
+void moveVertex(int vertexIndex, unsigned char dir, float amount) {
+	if (vertexIndex < 0 || vertexIndex >= 8) {
+        printf("Vertex index out of bounds.\n");
+        return;
+    }
+    
+    int arrayIndex = vertexIndex * 3;
+
+	if(dir == 'w') {
+    	vertices[arrayIndex + 1] = vertices[arrayIndex + 1] + amount;
+	}
+	else if(dir == 's') {
+    	vertices[arrayIndex + 1] = vertices[arrayIndex + 1] - amount;
+	}
+
+	if(dir == 'a') {
+    	vertices[arrayIndex] = vertices[arrayIndex] + amount;
+	}
+	else if(dir == 'd') {
+    	vertices[arrayIndex] = vertices[arrayIndex] - amount;
+	}
+
+	if(dir == 'q') {
+    	vertices[arrayIndex + 2] = vertices[arrayIndex + 2] + amount;
+	}
+	else if(dir == 'e') {
+    	vertices[arrayIndex + 2] = vertices[arrayIndex + 2] - amount;
+	}
+
+	glBindBuffer(GL_ARRAY_BUFFER, vertexBufferObjID);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+}
+
 void updateVertexPosition(int vertexIndex, float x, float y, float z) {
     if (vertexIndex < 0 || vertexIndex >= 8) {
         printf("Vertex index out of bounds.\n");
@@ -181,26 +214,31 @@ void updateVertexPosition(int vertexIndex, float x, float y, float z) {
     glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 }
 
+int selectedVertexIndex = -1;
 void updateVertexPositions() {
-	for(int i = 0; i < 8; i++) {
-		float currentX, currentY, currentZ;
-		getCurrentVertexPosition(i, &currentX, &currentY, &currentZ);
+	float currentX, currentY, currentZ;
+	getCurrentVertexPosition(selectedVertexIndex, &currentX, &currentY, &currentZ);
 
-		float randomX = currentX + generateRandomFloat(0.005f);
-		float randomY = currentY + generateRandomFloat(0.005f);
-		float randomZ = currentZ + generateRandomFloat(0.005f);
+	float randomX = currentX + generateRandomFloat(0.025f);
+	float randomY = currentY + generateRandomFloat(0.025f);
+	float randomZ = currentZ + generateRandomFloat(0.025f);
 
-		updateVertexPosition(i, randomX, randomY, randomZ);
-	}
+	updateVertexPosition(selectedVertexIndex, randomX, randomY, randomZ);
 }
 
-int selectedVertexIndex = -1;
+float angle_x = 0.0f;
+float angle_y = 0.0f;
+float angle_z = 0.0f;
 
 float angle = 0.0f;
 float speed = 0.05f;
 void display(void)
 {
-	updateVertexPositions(); //debug purposes
+	/*
+	if(selectedVertexIndex != -1) {
+		updateVertexPositions(); //debug purposes
+	}
+	*/
     printError("pre display");
     // angle += speed;
 
@@ -219,6 +257,12 @@ void display(void)
     rotationMatrix[10] = cos(angle);
     glUniformMatrix4fv(glGetUniformLocation(program, "rotationMatrix"), 1, GL_TRUE, rotationMatrix);
 	*/
+
+	rotationMatrix1 = Rx(angle_x);
+	rotationMatrix2 = Ry(angle_y);
+	rotationMatrix3 = Rz(angle_z);
+	mdlMatrix = translationMatrix * rotationMatrix1 * rotationMatrix2 * rotationMatrix3;
+	glUniformMatrix4fv(glGetUniformLocation(program, "mdlMatrix"), 1, GL_TRUE, mdlMatrix.m);
 
     glBindVertexArray(vertexArrayObjID);
     
@@ -318,6 +362,27 @@ void mouse(int button, int state, int x, int y) {
     }
 }
 
+void keys(unsigned char key, int x, int y) 
+{
+	if(key == 'w' || key == 's' || key == 'a' || key == 'd' || key == 'q' || key == 'e') {
+		moveVertex(selectedVertexIndex, key, 0.025f);
+	}
+	
+	if(key == 'z') {
+		angle_x += speed;
+	}
+	else if(key == 'x') {
+		angle_x -= speed;
+	}
+
+	if(key == 'c') {
+		angle_y += speed;
+	}
+	else if(key == 'v') {
+		angle_y -= speed;
+	}
+}
+
 int main(int argc, char *argv[])
 {
 	glutInit(&argc, argv);
@@ -328,6 +393,7 @@ int main(int argc, char *argv[])
 	glutRepeatingTimer(20);
 	glutDisplayFunc(display); 
 	glutMouseFunc(mouse);
+	glutKeyboardFunc(keys);
 	init ();
 	glutMainLoop();
 
