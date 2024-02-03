@@ -5,6 +5,7 @@
 #include "LittleOBJLoader.h"
 #include "LoadTGA.h"
 #include "VectorUtils4.h"
+#include "SimpleGUI.h"
 
 #include <stdlib.h>
 #include <iostream>
@@ -99,6 +100,9 @@ float generateRandomFloat(float range) {
     return dis(gen);
 }
 
+int selectedVertexIndex = -1;
+float selectedX, selectedY, selectedZ;
+
 unsigned int indexBufferObjID;
 unsigned int lineIndexBufferObjID;
 unsigned int vertexBufferObjID;
@@ -151,6 +155,28 @@ void init(void)
 	glUniformMatrix4fv(glGetUniformLocation(program, "projMatrix"), 1, GL_TRUE, projectionMatrix.m);
 
 	printError("init arrays");
+
+	sgSetPosition(30, 30);
+    sgSetTextColor(0,0,0);
+    sgSetBackgroundColor(0.25, 0.25, 0.25, 0.5);
+    sgSetFrameColor(0,0,0);
+    sgCreateStaticString(20, 20, "VERTEX CONTROLS");
+	sgCreateDisplayInt(-1, -1, "Selected Vertex: ", &selectedVertexIndex);
+    sgCreateDisplayFloat(-1, -1, "Vertex X: ", &selectedX);
+    sgCreateDisplayFloat(-1, -1, "Vertex Y: ", &selectedY);
+    sgCreateDisplayFloat(-1, -1, "Vertex Z: ", &selectedZ);
+    //sgCreateStaticString(20, 60, "SCENE CONTROLS");
+	/*
+    sgCreateDisplayFloat(-1, -1, "Wind velocity: ", &windVelocity);
+	sgCreateSlider(-1, -1, 200, &windVelocity, 0.1, 1.5);
+    sgCreateDisplayFloat(-1, -1, "Boat rotation: ", &boatRotation);
+	sgCreateSlider(-1, -1, 200, &boatRotation, -M_PI, M_PI);
+    sgCreateDisplayFloat(-1, -1, "Sail rotation: ", &sailRotation);
+	sgCreateSlider(-1, -1, 200, &sailRotation, -2, 2);
+    sgCreateButton(-1, -1, "Reset", Reset);
+    sgCreateButton(-1, -1, "Start", Start);
+	*/
+
 }
 
 void getCurrentVertexPosition(int vertexIndex, float* x, float* y, float* z) {
@@ -172,6 +198,7 @@ void moveVertex(int vertexIndex, unsigned char dir, float amount) {
     }
     
     int arrayIndex = vertexIndex * 3;
+    getCurrentVertexPosition(vertexIndex, &selectedX, &selectedY, &selectedZ);
 
 	if(dir == 'w') {
     	vertices[arrayIndex + 1] = vertices[arrayIndex + 1] + amount;
@@ -214,7 +241,6 @@ void updateVertexPosition(int vertexIndex, float x, float y, float z) {
     glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 }
 
-int selectedVertexIndex = -1;
 void updateVertexPositions() {
 	float currentX, currentY, currentZ;
 	getCurrentVertexPosition(selectedVertexIndex, &currentX, &currentY, &currentZ);
@@ -295,6 +321,8 @@ void display(void)
 	}
     glUniform1i(glGetUniformLocation(program, "useUniformColor"), GL_FALSE);
 
+	sgDraw();
+
     printError("display");
     
     glutSwapBuffers();
@@ -358,6 +386,7 @@ void mouse(int button, int state, int x, int y) {
         }
 
         selectedVertexIndex = closestVertexIndex;
+        getCurrentVertexPosition(selectedVertexIndex, &selectedX, &selectedY, &selectedZ);
         glutPostRedisplay();
     }
 }
