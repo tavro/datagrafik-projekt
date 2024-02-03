@@ -102,6 +102,7 @@ float generateRandomFloat(float range) {
 
 int selectedVertexIndex = -1;
 float selectedX, selectedY, selectedZ;
+float angle_x, angle_y, angle_z;
 
 unsigned int indexBufferObjID;
 unsigned int lineIndexBufferObjID;
@@ -165,18 +166,13 @@ void init(void)
     sgCreateDisplayFloat(-1, -1, "Vertex X: ", &selectedX);
     sgCreateDisplayFloat(-1, -1, "Vertex Y: ", &selectedY);
     sgCreateDisplayFloat(-1, -1, "Vertex Z: ", &selectedZ);
-    //sgCreateStaticString(20, 60, "SCENE CONTROLS");
-	/*
-    sgCreateDisplayFloat(-1, -1, "Wind velocity: ", &windVelocity);
-	sgCreateSlider(-1, -1, 200, &windVelocity, 0.1, 1.5);
-    sgCreateDisplayFloat(-1, -1, "Boat rotation: ", &boatRotation);
-	sgCreateSlider(-1, -1, 200, &boatRotation, -M_PI, M_PI);
-    sgCreateDisplayFloat(-1, -1, "Sail rotation: ", &sailRotation);
-	sgCreateSlider(-1, -1, 200, &sailRotation, -2, 2);
-    sgCreateButton(-1, -1, "Reset", Reset);
-    sgCreateButton(-1, -1, "Start", Start);
-	*/
-
+    sgCreateStaticString(20, 140, "SCENE CONTROLS");
+    sgCreateDisplayFloat(-1, -1, "Angle X: ", &angle_x);
+	sgCreateSlider(-1, -1, 200, &angle_x, -M_PI, M_PI);
+    sgCreateDisplayFloat(-1, -1, "Angle Y: ", &angle_y);
+	sgCreateSlider(-1, -1, 200, &angle_y, -M_PI, M_PI);
+    sgCreateDisplayFloat(-1, -1, "Angle Z: ", &angle_z);
+	sgCreateSlider(-1, -1, 200, &angle_z, -M_PI, M_PI);
 }
 
 void getCurrentVertexPosition(int vertexIndex, float* x, float* y, float* z) {
@@ -251,10 +247,6 @@ void updateVertexPositions() {
 
 	updateVertexPosition(selectedVertexIndex, randomX, randomY, randomZ);
 }
-
-float angle_x = 0.0f;
-float angle_y = 0.0f;
-float angle_z = 0.0f;
 
 float angle = 0.0f;
 float speed = 0.05f;
@@ -389,6 +381,7 @@ void mouse(int button, int state, int x, int y) {
         getCurrentVertexPosition(selectedVertexIndex, &selectedX, &selectedY, &selectedZ);
         glutPostRedisplay();
     }
+	sgMouse(state, x, y);
 }
 
 void keys(unsigned char key, int x, int y) 
@@ -412,6 +405,11 @@ void keys(unsigned char key, int x, int y)
 	}
 }
 
+void mousedrag(int x, int y)
+{
+	sgMouseDrag(x, y);
+}
+
 int main(int argc, char *argv[])
 {
 	glutInit(&argc, argv);
@@ -423,6 +421,7 @@ int main(int argc, char *argv[])
 	glutDisplayFunc(display); 
 	glutMouseFunc(mouse);
 	glutKeyboardFunc(keys);
+    glutMotionFunc(mousedrag);
 	init ();
 	glutMainLoop();
 
