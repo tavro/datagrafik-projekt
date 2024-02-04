@@ -120,7 +120,7 @@ GLuint program;
 float selectedX, selectedY, selectedZ;
 float angle_x, angle_y, angle_z;
 
-int selectedVertexIndex = -1;
+std::vector<int> selectedVertices;
 
 unsigned int vertexArrayObjID;
 
@@ -195,11 +195,11 @@ void init(void)
 	sgSetTextColor(0,0,0);
 	sgSetBackgroundColor(0.25, 0.25, 0.25, 0.5);
 	sgSetFrameColor(0,0,0);
-	sgCreateStaticString(20, 20, "VERTEX CONTROLS");
-	sgCreateDisplayInt(-1, -1, "Selected Vertex: ", &selectedVertexIndex);
-	sgCreateDisplayFloat(-1, -1, "Vertex X: ", &selectedX);
-	sgCreateDisplayFloat(-1, -1, "Vertex Y: ", &selectedY);
-	sgCreateDisplayFloat(-1, -1, "Vertex Z: ", &selectedZ);
+	//sgCreateStaticString(20, 20, "VERTEX CONTROLS");
+	//sgCreateDisplayInt(-1, -1, "Selected Vertex: ", &selectedVertexIndex);
+	//sgCreateDisplayFloat(-1, -1, "Vertex X: ", &selectedX);
+	//sgCreateDisplayFloat(-1, -1, "Vertex Y: ", &selectedY);
+	//sgCreateDisplayFloat(-1, -1, "Vertex Z: ", &selectedZ);
 	sgCreateStaticString(20, 140, "SCENE CONTROLS");
 	sgCreateDisplayFloat(-1, -1, "Angle X: ", &angle_x);
 	sgCreateSlider(-1, -1, 200, &angle_x, -M_PI, M_PI);
@@ -272,6 +272,12 @@ void moveVertex(int vertexIndex, unsigned char dir, float amount) {
 	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 }
 
+void moveVertices(unsigned char dir, float amount) {
+	for(int i : selectedVertices) {
+		moveVertex(i, dir, amount);
+	}
+}
+
 void updateVertexPosition(int vertexIndex, float x, float y, float z) {
 	if (vertexIndex < 0 || vertexIndex >= 8) {
 		printf("Vertex index out of bounds.\n");
@@ -321,7 +327,7 @@ void display(void)
 
 	// draw vertices as points
 	for (int i = 0; i < 8; ++i) {
-		if (i == selectedVertexIndex) {
+		if (std::find(selectedVertices.begin(), selectedVertices.end(), i) != selectedVertices.end()) {
 			glPointSize(20.0f);
 			GLfloat selectedColor[3] = {1.0, 0.0, 0.0};
 			glUniform3fv(glGetUniformLocation(program, "uniformColor"), 1, selectedColor);
@@ -337,8 +343,9 @@ void display(void)
 	GLint posAttribLocation = glGetAttribLocation(program, "in_Position");
 	GLint colorAttribLocation = glGetAttribLocation(program, "in_Color");
 
-	if (selectedVertexIndex != -1) {
-		updateAxisLines(selectedVertexIndex);
+	/*
+	if (!selectedVertices.empty()) {
+		updateAxisLines(selectedVertexIndex); // TODO: Place axis in between all points
 
 		glEnableVertexAttribArray(posAttribLocation);
 		glBindBuffer(GL_ARRAY_BUFFER, axisVertexBufferObjID);
@@ -350,6 +357,7 @@ void display(void)
 
 		glDrawArrays(GL_LINES, 0, 6);
 	}
+	*/
 
 	glBindBuffer(GL_ARRAY_BUFFER, vertexBufferObjID);
 	glVertexAttribPointer(posAttribLocation, 3, GL_FLOAT, GL_FALSE, 0, 0);
@@ -392,6 +400,7 @@ Ray createRayFromScreenCoordinates(int screenX, int screenY) {
 	return Ray{rayOrigin, rayDirection};
 }
 
+bool shift_down = false;
 void mouse(int button, int state, int x, int y) {
 	if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN) {
 		Ray ray = createRayFromScreenCoordinates(x, y);
@@ -423,8 +432,14 @@ void mouse(int button, int state, int x, int y) {
 			}
 		}
 
-		selectedVertexIndex = closestVertexIndex;
-		getCurrentVertexPosition(selectedVertexIndex, &selectedX, &selectedY, &selectedZ);
+		if(!shift_down) {
+			selectedVertices.clear();
+		}
+		
+		if(closestVertexIndex != -1) {
+			selectedVertices.push_back(closestVertexIndex);
+		}
+		//getCurrentVertexPosition(selectedVertexIndex, &selectedX, &selectedY, &selectedZ);
 		glutPostRedisplay();
 	}
 	sgMouse(state, x, y);
@@ -433,8 +448,24 @@ void mouse(int button, int state, int x, int y) {
 void keys(unsigned char key, int x, int y) 
 {
 	if(key == 'w' || key == 's' || key == 'a' || key == 'd' || key == 'q' || key == 'e') {
-		moveVertex(selectedVertexIndex, key, 0.025f);
+		moveVertices(key, 0.025f);
 	}
+}
+
+void specialKeys(unsigned char key, int x, int y) {
+    switch (key) {
+        case 14: // shift
+            shift_down = true;
+            break;
+    }
+}
+
+void specialKeysUp(unsigned char key, int x, int y) {
+    switch (key) {
+        case 14:
+            shift_down = false;
+            break;
+    }
 }
 
 void mousedrag(int x, int y)
@@ -453,6 +484,8 @@ int main(int argc, char *argv[])
 	glutDisplayFunc(display); 
 	glutMouseFunc(mouse);
 	glutKeyboardFunc(keys);
+	glutSpecialFunc(specialKeys);
+    glutSpecialUpFunc(specialKeysUp);
 	glutMotionFunc(mousedrag);
 	init ();
 	glutMainLoop();
