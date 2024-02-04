@@ -207,8 +207,16 @@ void init(void)
 	sgCreateSlider(-1, -1, 200, &angle_z, -M_PI, M_PI);
 }
 
+bool inRange(long unsigned int i) {
+	if (i < 0 || i >= vertices.size()) {
+		printf("Vertex index out of bounds.\n");
+		return false;
+	}
+	return true;
+}
+
 void updateAxisLines(int vertexIndex) {
-	if (vertexIndex < 0 || vertexIndex >= 8) return;
+	if(!inRange(vertexIndex)) return;
 
 	float x = vertices[vertexIndex * 3];
 	float y = vertices[vertexIndex * 3 + 1];
@@ -225,10 +233,7 @@ void updateAxisLines(int vertexIndex) {
 }
 
 void getCurrentVertexPosition(int vertexIndex, float* x, float* y, float* z) {
-	if (vertexIndex < 0 || vertexIndex >= 8) {
-		printf("Vertex index out of bounds.\n");
-		return;
-	}
+	if(!inRange(vertexIndex)) return;
 		
 	int arrayIndex = vertexIndex * 3;
 	*x = vertices[arrayIndex];
@@ -237,10 +242,7 @@ void getCurrentVertexPosition(int vertexIndex, float* x, float* y, float* z) {
 }
 
 void moveVertex(int vertexIndex, unsigned char dir, float amount) {
-	if (vertexIndex < 0 || vertexIndex >= 8) {
-		printf("Vertex index out of bounds.\n");
-		return;
-	}
+	if(!inRange(vertexIndex)) return;
 		
 	int arrayIndex = vertexIndex * 3;
 	getCurrentVertexPosition(vertexIndex, &selectedX, &selectedY, &selectedZ);
@@ -277,10 +279,7 @@ void moveVertices(unsigned char dir, float amount) {
 }
 
 void updateVertexPosition(int vertexIndex, float x, float y, float z) {
-	if (vertexIndex < 0 || vertexIndex >= 8) {
-		printf("Vertex index out of bounds.\n");
-		return;
-	}
+	if(!inRange(vertexIndex)) return;
 		
 	int arrayIndex = vertexIndex * 3;
 
@@ -311,7 +310,7 @@ void display(void)
 		
 	// draw cube
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBufferObjID);
-	glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_BYTE, 0);
+	glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_BYTE, 0);
 
 	// setup line drawing
 	glUniform1i(glGetUniformLocation(program, "useUniformColor"), GL_TRUE);
@@ -321,10 +320,9 @@ void display(void)
 	// draw lines
 	glLineWidth(2.0f);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, lineIndexBufferObjID);
-	glDrawElements(GL_LINES, 36, GL_UNSIGNED_BYTE, 0);
+	glDrawElements(GL_LINES, indices.size(), GL_UNSIGNED_BYTE, 0);
 
-	// draw vertices as points
-	for (int i = 0; i < 8; ++i) {
+	for (long unsigned int i = 0; i < vertices.size()/3; ++i) {
 		if (std::find(selectedVertices.begin(), selectedVertices.end(), i) != selectedVertices.end()) {
 			glPointSize(20.0f);
 			GLfloat selectedColor[3] = {1.0, 0.0, 0.0};
@@ -341,9 +339,8 @@ void display(void)
 	GLint posAttribLocation = glGetAttribLocation(program, "in_Position");
 	GLint colorAttribLocation = glGetAttribLocation(program, "in_Color");
 
-	/*
 	if (!selectedVertices.empty()) {
-		updateAxisLines(selectedVertexIndex); // TODO: Place axis in between all points
+		updateAxisLines(selectedVertices[selectedVertices.size()-1]); // TODO: Place axis in between all points
 
 		glEnableVertexAttribArray(posAttribLocation);
 		glBindBuffer(GL_ARRAY_BUFFER, axisVertexBufferObjID);
@@ -355,7 +352,6 @@ void display(void)
 
 		glDrawArrays(GL_LINES, 0, 6);
 	}
-	*/
 
 	glBindBuffer(GL_ARRAY_BUFFER, vertexBufferObjID);
 	glVertexAttribPointer(posAttribLocation, 3, GL_FLOAT, GL_FALSE, 0, 0);
@@ -407,7 +403,7 @@ void mouse(int button, int state, int x, int y) {
 		float closestDistance = std::numeric_limits<float>::max();
 		int closestVertexIndex = -1;
 
-		for (int i = 0; i < 8; ++i) {
+		for (long unsigned int i = 0; i < vertices.size(); ++i) {
 			float vertexWorldX, vertexWorldY, vertexWorldZ;
 			getCurrentVertexPosition(i, &vertexWorldX, &vertexWorldY, &vertexWorldZ);
 
@@ -444,8 +440,46 @@ void mouse(int button, int state, int x, int y) {
 	sgMouse(state, x, y);
 }
 
-void extrude() {
-	// TODO: rebuild vertices and indices and colors vectors and add the new vertices in the correct positions
+void extrude(float distance) {
+    std::vector<float> extrusionDirection = {0, 0, 1};
+    int newVertexStartIndex = vertices.size() / 3;
+
+    for (int selectedIndex : selectedVertices) {
+        int vertexPosIndex = selectedIndex * 3;
+        float newX = vertices[vertexPosIndex] + extrusionDirection[0] * distance;
+        float newY = vertices[vertexPosIndex + 1] + extrusionDirection[1] * distance;
+        float newZ = vertices[vertexPosIndex + 2] + extrusionDirection[2] * distance;
+
+        vertices.push_back(newX);
+        vertices.push_back(newY);
+        vertices.push_back(newZ);
+
+        for (int j = 0; j < 3; ++j) {
+            colors.push_back(static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX));
+        }
+    }
+
+    for (size_t i = 0; i < selectedVertices.size(); ++i) {
+        int originalIndex = selectedVertices[i];
+        int newIndex = newVertexStartIndex + i;
+
+        indices.push_back(originalIndex);
+        indices.push_back((i + 1) < selectedVertices.size() ? newVertexStartIndex + i + 1 : newVertexStartIndex);
+        indices.push_back(newIndex);
+
+        indices.push_back(originalIndex);
+        indices.push_back((i + 1) < selectedVertices.size() ? selectedVertices[i + 1] : selectedVertices[0]);
+        indices.push_back((i + 1) < selectedVertices.size() ? newVertexStartIndex + i + 1 : newVertexStartIndex);
+    }
+
+    glBindBuffer(GL_ARRAY_BUFFER, vertexBufferObjID);
+    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(GLfloat), &vertices[0], GL_STATIC_DRAW);
+
+    glBindBuffer(GL_ARRAY_BUFFER, colorBufferObjID);
+    glBufferData(GL_ARRAY_BUFFER, colors.size() * sizeof(GLfloat), &colors[0], GL_STATIC_DRAW);
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBufferObjID);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(GLuint), &indices[0], GL_STATIC_DRAW);
 }
 
 void keys(unsigned char key, int x, int y) 
@@ -456,15 +490,14 @@ void keys(unsigned char key, int x, int y)
 	else if(key == 'l') {
 		locked = !locked;
 	}
-	else if (key == 'e') {
-		//selectedVertices.clear();
+	else if (key == 'E') {
 		if(selectedVertices.size() == 3) {
-			extrude();
+			extrude(0.5f);
 		}
-		//GLubyte newBaseIndex = static_cast<GLubyte>(vertices.size() / 3 - 3);
-		//selectedVertices.push_back(newBaseIndex);
-		//selectedVertices.push_back(newBaseIndex + 1);
-		//selectedVertices.push_back(newBaseIndex + 2);
+		selectedVertices.clear();
+		//selectedVertices.push_back(newIndex);
+		//selectedVertices.push_back(newIndex + 1);
+		//selectedVertices.push_back(newIndex + 2);
 	}
 }
 
