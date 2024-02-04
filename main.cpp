@@ -55,7 +55,8 @@ struct PairComparator {
     }
 };
 
-std::vector<GLubyte> generateLineIndices(const GLubyte* triangleIndices, size_t numTriangleIndices) {
+std::vector<GLubyte> lineIndices;
+void generateLineIndices(const GLubyte* triangleIndices, size_t numTriangleIndices) {
     std::set<std::pair<GLubyte, GLubyte>, PairComparator> uniqueEdges;
     
     for (size_t i = 0; i < numTriangleIndices; i += 3) {
@@ -68,16 +69,13 @@ std::vector<GLubyte> generateLineIndices(const GLubyte* triangleIndices, size_t 
         uniqueEdges.insert(std::minmax({c, a}));
     }
     
-    std::vector<GLubyte> lineIndices;
+	lineIndices.clear();
     for (const auto& edge : uniqueEdges) {
         lineIndices.push_back(edge.first);
         lineIndices.push_back(edge.second);
     }
-    
-    return lineIndices;
 }
 
-GLubyte lineIndices[36];
 GLfloat axisLinesColors[6*3];
 GLfloat axisLinesVertices[6*3];
 void loadAxisColorData(const char* filename) {
@@ -136,10 +134,7 @@ void init(void)
 	loadCubeData("./data/cubeData.txt");
 	loadAxisColorData("./data/axisColorData.txt");
 
-	std::vector<GLubyte> idx = generateLineIndices(indices.data(), 36);
-    for (size_t i = 0; i < idx.size(); ++i) {
-        lineIndices[i] = idx[i];
-    }
+	generateLineIndices(indices.data(), indices.size());
 
 	glClearColor(0.5f, 0.5f, 0.5f, 1.0f);
 	glEnable(GL_DEPTH_TEST);
@@ -171,7 +166,7 @@ void init(void)
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(GLubyte), indices.data(), GL_STATIC_DRAW);
 
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, lineIndexBufferObjID);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(lineIndices), lineIndices, GL_STATIC_DRAW);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, lineIndices.size() * sizeof(GLubyte), lineIndices.data(), GL_STATIC_DRAW);
 
 	translationMatrix = T(0, 0, -2);
 	mdlMatrix = translationMatrix;
@@ -471,6 +466,11 @@ void extrude(float distance) {
         indices.push_back((i + 1) < selectedVertices.size() ? selectedVertices[i + 1] : selectedVertices[0]);
         indices.push_back((i + 1) < selectedVertices.size() ? newVertexStartIndex + i + 1 : newVertexStartIndex);
     }
+
+	generateLineIndices(indices.data(), indices.size());
+
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, lineIndexBufferObjID);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, lineIndices.size() * sizeof(GLubyte), lineIndices.data(), GL_STATIC_DRAW);
 
     glBindBuffer(GL_ARRAY_BUFFER, vertexBufferObjID);
     glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(GLfloat), &vertices[0], GL_STATIC_DRAW);
