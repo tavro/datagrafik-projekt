@@ -482,6 +482,18 @@ void extrude(float distance) {
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(GLuint), &indices[0], GL_STATIC_DRAW);
 }
 
+void deleteFace() {
+	// TODO: Implement
+}
+
+void saveToFile(std::string path) {
+	// TODO: Implement
+}
+
+void loadFromFile(std::string path) {
+	// TODO: Implement
+}
+
 void keys(unsigned char key, int x, int y) 
 {
 	if(key == 'w' || key == 's' || key == 'a' || key == 'd' || key == 'q' || key == 'e') {
@@ -495,9 +507,6 @@ void keys(unsigned char key, int x, int y)
 			extrude(0.5f);
 		}
 		selectedVertices.clear();
-		//selectedVertices.push_back(newIndex);
-		//selectedVertices.push_back(newIndex + 1);
-		//selectedVertices.push_back(newIndex + 2);
 	}
 }
 

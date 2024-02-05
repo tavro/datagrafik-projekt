@@ -1,1 +1,5 @@
-- [ ] Idea 1
+- [ ] Load model from file
+- [ ] Save model to file
+- [ ] Delete vertices
+- [ ] Scroll to move camera further or closer
+- [ ] Skybox
