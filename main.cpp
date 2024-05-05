@@ -5,7 +5,6 @@
 #include "LittleOBJLoader.h"
 #include "LoadTGA.h"
 #include "VectorUtils4.h"
-#include "SimpleGUI.h"
 
 #include <stdlib.h>
 #include <iostream>
@@ -19,6 +18,27 @@
 #include <set>
 #include <utility>
 #include <algorithm>
+
+enum LightingMode {
+    AMBIENT,
+    DIFFUSE,
+    SPECULAR,
+    COMBINED
+};
+
+bool renderWireframe = true;
+
+void toggleWireframe() {
+    renderWireframe = !renderWireframe;
+    glutPostRedisplay();
+}
+
+int currentLightingMode = COMBINED;
+
+float cameraDistance = 0.5f;
+int prevx = 0, prevy = 0;
+
+mat4 modelRotation = IdentityMatrix();
 
 std::vector<GLfloat> colors(8 * 3);
 std::vector<GLubyte> indices(36);
@@ -108,7 +128,6 @@ mat4 viewToWorld = lookAtv(
 );
 
 mat4 translationMatrix;
-mat4 rotationMatrix1, rotationMatrix2, rotationMatrix3;
 mat4 mdlMatrix;
 
 GLuint program;
@@ -126,6 +145,45 @@ unsigned int lineIndexBufferObjID;
 unsigned int vertexBufferObjID;
 unsigned int indexBufferObjID;
 unsigned int colorBufferObjID;
+unsigned int normalBufferObjID;
+
+vec3 lightPos = {1.2f, 1.0f, 2.0f};
+vec3 lightColor = {1.0f, 1.0f, 1.0f};
+float ambientStrength = 1.0f;
+float specularStrength = 1.5f;
+int shininess = 32;
+
+void calculateNormals() {
+    std::vector<vec3> temp_normals(vertices.size() / 3);
+    for (size_t i = 0; i < indices.size(); i += 3) {
+        vec3 v0(vertices[3 * indices[i]], vertices[3 * indices[i] + 1], vertices[3 * indices[i] + 2]);
+        vec3 v1(vertices[3 * indices[i + 1]], vertices[3 * indices[i + 1] + 1], vertices[3 * indices[i + 1] + 2]);
+        vec3 v2(vertices[3 * indices[i + 2]], vertices[3 * indices[i + 2] + 1], vertices[3 * indices[i + 2] + 2]);
+
+        vec3 edge1 = v1 - v0;
+        vec3 edge2 = v2 - v0;
+        vec3 normal = Normalize(CrossProduct(edge1, edge2));
+
+        temp_normals[indices[i]] += normal;
+        temp_normals[indices[i + 1]] += normal;
+        temp_normals[indices[i + 2]] += normal;
+    }
+
+    for (vec3& n : temp_normals) {
+        n = Normalize(n);
+    }
+
+    std::vector<GLfloat> flat_normals;
+    for (const vec3& n : temp_normals) {
+        flat_normals.push_back(n.x);
+        flat_normals.push_back(n.y);
+        flat_normals.push_back(n.z);
+    }
+
+    glGenBuffers(1, &normalBufferObjID);
+    glBindBuffer(GL_ARRAY_BUFFER, normalBufferObjID);
+    glBufferData(GL_ARRAY_BUFFER, flat_normals.size() * sizeof(GLfloat), flat_normals.data(), GL_STATIC_DRAW);
+}
 
 void init(void)
 {
@@ -136,6 +194,8 @@ void init(void)
 
 	generateLineIndices(indices.data(), indices.size());
 
+	calculateNormals();
+
 	glClearColor(0.5f, 0.5f, 0.5f, 1.0f);
 	glEnable(GL_DEPTH_TEST);
 	glDisable(GL_CULL_FACE);
@@ -143,6 +203,14 @@ void init(void)
 
 	program = loadShaders("cube.vert", "cube.frag");
 	printError("init shader");
+
+	vec3 cameraPos = {0.0f, 0.0f, cameraDistance};
+	glUniform3fv(glGetUniformLocation(program, "lightPos"), 1, &lightPos.x);
+    glUniform3fv(glGetUniformLocation(program, "lightColor"), 1, &lightColor.x);
+    glUniform3fv(glGetUniformLocation(program, "viewPos"), 1, &cameraPos.x);
+    glUniform1f(glGetUniformLocation(program, "ambientStrength"), ambientStrength);
+    glUniform1f(glGetUniformLocation(program, "specularStrength"), specularStrength);
+    glUniform1i(glGetUniformLocation(program, "shininess"), shininess);
 
 	glGenVertexArrays(1, &vertexArrayObjID);
 	glBindVertexArray(vertexArrayObjID);
@@ -174,6 +242,9 @@ void init(void)
 	glUniformMatrix4fv(glGetUniformLocation(program, "mdlMatrix"), 1, GL_TRUE, mdlMatrix.m);
 	glUniformMatrix4fv(glGetUniformLocation(program, "projMatrix"), 1, GL_TRUE, projectionMatrix.m);
 
+	glVertexAttribPointer(glGetAttribLocation(program, "in_Normal"), 3, GL_FLOAT, GL_FALSE, 0, 0);
+	glEnableVertexAttribArray(glGetAttribLocation(program, "in_Normal"));
+
 	glGenBuffers(1, &axisVertexBufferObjID);
 	glBindBuffer(GL_ARRAY_BUFFER, axisVertexBufferObjID);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(axisLinesVertices), axisLinesVertices, GL_DYNAMIC_DRAW);
@@ -183,23 +254,6 @@ void init(void)
 	glBufferData(GL_ARRAY_BUFFER, sizeof(axisLinesColors), axisLinesColors, GL_STATIC_DRAW);
 
 	printError("init arrays");
-
-	sgSetPosition(30, 30);
-	sgSetTextColor(0,0,0);
-	sgSetBackgroundColor(0.25, 0.25, 0.25, 0.5);
-	sgSetFrameColor(0,0,0);
-	//sgCreateStaticString(20, 20, "VERTEX CONTROLS");
-	//sgCreateDisplayInt(-1, -1, "Selected Vertex: ", &selectedVertexIndex);
-	//sgCreateDisplayFloat(-1, -1, "Vertex X: ", &selectedX);
-	//sgCreateDisplayFloat(-1, -1, "Vertex Y: ", &selectedY);
-	//sgCreateDisplayFloat(-1, -1, "Vertex Z: ", &selectedZ);
-	sgCreateStaticString(20, 140, "SCENE CONTROLS");
-	sgCreateDisplayFloat(-1, -1, "Angle X: ", &angle_x);
-	sgCreateSlider(-1, -1, 200, &angle_x, -M_PI, M_PI);
-	sgCreateDisplayFloat(-1, -1, "Angle Y: ", &angle_y);
-	sgCreateSlider(-1, -1, 200, &angle_y, -M_PI, M_PI);
-	sgCreateDisplayFloat(-1, -1, "Angle Z: ", &angle_z);
-	sgCreateSlider(-1, -1, 200, &angle_z, -M_PI, M_PI);
 }
 
 bool inRange(long unsigned int i) {
@@ -294,11 +348,11 @@ void display(void)
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	glUseProgram(program);
-		
-	rotationMatrix1 = Rx(angle_x);
-	rotationMatrix2 = Ry(angle_y);
-	rotationMatrix3 = Rz(angle_z);
-	mdlMatrix = translationMatrix * rotationMatrix1 * rotationMatrix2 * rotationMatrix3;
+    glUniform1i(glGetUniformLocation(program, "useLighting"), GL_TRUE);
+    glUniform1i(glGetUniformLocation(program, "useStaticColor"), GL_FALSE);
+	
+	glUniformMatrix4fv(glGetUniformLocation(program, "camMatrix"), 1, GL_TRUE, viewToWorld.m);
+	mdlMatrix = translationMatrix * modelRotation;
 	glUniformMatrix4fv(glGetUniformLocation(program, "mdlMatrix"), 1, GL_TRUE, mdlMatrix.m);
 
 	glBindVertexArray(vertexArrayObjID);
@@ -307,56 +361,68 @@ void display(void)
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBufferObjID);
 	glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_BYTE, 0);
 
-	// setup line drawing
-	glUniform1i(glGetUniformLocation(program, "useUniformColor"), GL_TRUE);
-	GLfloat lineColor[3] = {0.0, 0.0, 0.0};
-	glUniform3fv(glGetUniformLocation(program, "uniformColor"), 1, lineColor);
+    glUniform1i(glGetUniformLocation(program, "lightingMode"), currentLightingMode);
+    glUniform1i(glGetUniformLocation(program, "useLighting"), GL_FALSE);
+    glUniform1i(glGetUniformLocation(program, "useStaticColor"), GL_TRUE);
 
-	// draw lines
-	glLineWidth(2.0f);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, lineIndexBufferObjID);
-	glDrawElements(GL_LINES, indices.size(), GL_UNSIGNED_BYTE, 0);
+	if (renderWireframe) {
+		// setup line drawing
+		glUniform1i(glGetUniformLocation(program, "useUniformColor"), GL_TRUE);
+		GLfloat lineColor[3] = {0.0, 0.0, 0.0};
+		glUniform3fv(glGetUniformLocation(program, "uniformColor"), 1, lineColor);
+    	glUniform3fv(glGetUniformLocation(program, "staticColor"), 1, lineColor);
 
-	for (long unsigned int i = 0; i < vertices.size()/3; ++i) {
-		if (std::find(selectedVertices.begin(), selectedVertices.end(), i) != selectedVertices.end()) {
-			glPointSize(20.0f);
-			GLfloat selectedColor[3] = {1.0, 0.0, 0.0};
-			glUniform3fv(glGetUniformLocation(program, "uniformColor"), 1, selectedColor);
-		} else {
-			glPointSize(10.0f);
-			GLfloat pointColor[3] = {1.0, 0.5, 0.0};
-			glUniform3fv(glGetUniformLocation(program, "uniformColor"), 1, pointColor);
+		// draw lines
+		glLineWidth(2.0f);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, lineIndexBufferObjID);
+		glDrawElements(GL_LINES, indices.size(), GL_UNSIGNED_BYTE, 0);
+
+		for (long unsigned int i = 0; i < vertices.size()/3; ++i) {
+			if (std::find(selectedVertices.begin(), selectedVertices.end(), i) != selectedVertices.end()) {
+				glPointSize(20.0f);
+				GLfloat selectedColor[3] = {1.0, 0.0, 0.0};
+				glUniform3fv(glGetUniformLocation(program, "uniformColor"), 1, selectedColor);
+    			glUniform3fv(glGetUniformLocation(program, "staticColor"), 1, selectedColor);
+			} else {
+				glPointSize(10.0f);
+				GLfloat pointColor[3] = {1.0, 0.5, 0.0};
+				glUniform3fv(glGetUniformLocation(program, "uniformColor"), 1, pointColor);
+    			glUniform3fv(glGetUniformLocation(program, "staticColor"), 1, pointColor);
+			}
+			glDrawArrays(GL_POINTS, i, 1);
 		}
-		glDrawArrays(GL_POINTS, i, 1);
-	}
-	glUniform1i(glGetUniformLocation(program, "useUniformColor"), GL_FALSE);
+		glUniform1i(glGetUniformLocation(program, "useUniformColor"), GL_FALSE);
+    	glUniform1i(glGetUniformLocation(program, "useStaticColor"), GL_FALSE);
 
-	GLint posAttribLocation = glGetAttribLocation(program, "in_Position");
-	GLint colorAttribLocation = glGetAttribLocation(program, "in_Color");
+		GLint posAttribLocation = glGetAttribLocation(program, "in_Position");
+		GLint colorAttribLocation = glGetAttribLocation(program, "in_Color");
 
-	if (!selectedVertices.empty()) {
-		updateAxisLines(selectedVertices[selectedVertices.size()-1]); // TODO: Place axis in between all points
+		glDisable(GL_DEPTH_TEST);
 
-		glEnableVertexAttribArray(posAttribLocation);
-		glBindBuffer(GL_ARRAY_BUFFER, axisVertexBufferObjID);
+		if (!selectedVertices.empty()) {
+			updateAxisLines(selectedVertices[selectedVertices.size()-1]);
+
+			glEnableVertexAttribArray(posAttribLocation);
+			glBindBuffer(GL_ARRAY_BUFFER, axisVertexBufferObjID);
+			glVertexAttribPointer(posAttribLocation, 3, GL_FLOAT, GL_FALSE, 0, 0);
+
+			glEnableVertexAttribArray(colorAttribLocation);
+			glBindBuffer(GL_ARRAY_BUFFER, axisColorBufferObjID);
+			glVertexAttribPointer(colorAttribLocation, 3, GL_FLOAT, GL_FALSE, 0, 0);
+
+			glDrawArrays(GL_LINES, 0, 6);
+		}
+
+		glEnable(GL_DEPTH_TEST);
+
+		glBindBuffer(GL_ARRAY_BUFFER, vertexBufferObjID);
 		glVertexAttribPointer(posAttribLocation, 3, GL_FLOAT, GL_FALSE, 0, 0);
+		glEnableVertexAttribArray(posAttribLocation);
 
-		glEnableVertexAttribArray(colorAttribLocation);
-		glBindBuffer(GL_ARRAY_BUFFER, axisColorBufferObjID);
+		glBindBuffer(GL_ARRAY_BUFFER, colorBufferObjID);
 		glVertexAttribPointer(colorAttribLocation, 3, GL_FLOAT, GL_FALSE, 0, 0);
-
-		glDrawArrays(GL_LINES, 0, 6);
+		glEnableVertexAttribArray(colorAttribLocation);
 	}
-
-	glBindBuffer(GL_ARRAY_BUFFER, vertexBufferObjID);
-	glVertexAttribPointer(posAttribLocation, 3, GL_FLOAT, GL_FALSE, 0, 0);
-	glEnableVertexAttribArray(posAttribLocation);
-
-	glBindBuffer(GL_ARRAY_BUFFER, colorBufferObjID);
-	glVertexAttribPointer(colorAttribLocation, 3, GL_FLOAT, GL_FALSE, 0, 0);
-	glEnableVertexAttribArray(colorAttribLocation);
-
-	sgDraw();
 
 	printError("display");
 		
@@ -384,7 +450,7 @@ Ray createRayFromScreenCoordinates(int screenX, int screenY) {
 	vec4 worldPos = inverse(viewToWorld) * clipPos;
 
 	vec3 rayOrigin = vec3(worldPos.x / worldPos.w, worldPos.y / worldPos.w, worldPos.z / worldPos.w);
-	vec3 rayDirection = normalize(rayOrigin - vec3(0.0f, 0.0f, 0.5f)); // camera position
+	vec3 rayDirection = normalize(rayOrigin - vec3(0.0f, 0.0f, cameraDistance)); // camera position
 
 	return Ray{rayOrigin, rayDirection};
 }
@@ -392,6 +458,11 @@ Ray createRayFromScreenCoordinates(int screenX, int screenY) {
 bool shift_down = false;
 bool locked = false;
 void mouse(int button, int state, int x, int y) {
+	if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN) {
+        prevx = x;
+        prevy = y;
+    }
+
 	if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN && !locked) {
 		Ray ray = createRayFromScreenCoordinates(x, y);
 
@@ -429,10 +500,9 @@ void mouse(int button, int state, int x, int y) {
 		if(closestVertexIndex != -1) {
 			selectedVertices.push_back(closestVertexIndex);
 		}
-		//getCurrentVertexPosition(selectedVertexIndex, &selectedX, &selectedY, &selectedZ);
+		
 		glutPostRedisplay();
 	}
-	sgMouse(state, x, y);
 }
 
 void extrude(float distance) {
@@ -482,22 +552,40 @@ void extrude(float distance) {
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(GLuint), &indices[0], GL_STATIC_DRAW);
 }
 
-void deleteFace() {
-	// TODO: Implement
-}
+void saveToFile(const std::string& path) {
+    std::ofstream out(path, std::ios::out);
 
-void saveToFile(std::string path) {
-	// TODO: Implement
-}
+    if (!out.is_open()) {
+        std::cerr << "Error opening file: " << path << std::endl;
+        return;
+    }
 
-void loadFromFile(std::string path) {
-	// TODO: Implement
+    out << "# List of geometric vertices\n";
+    for (size_t i = 0; i < vertices.size(); i += 3) {
+        out << "v " << vertices[i] << " " << vertices[i+1] << " " << vertices[i+2] << "\n";
+    }
+
+    out << "\n# List of vertex colors\n";
+    for (size_t i = 0; i < colors.size(); i += 3) {
+        out << "vc " << colors[i] << " " << colors[i+1] << " " << colors[i+2] << "\n";
+    }
+
+    out << "\n# List of faces\n";
+    for (size_t i = 0; i < indices.size(); i += 3) {
+        out << "f " << (indices[i] + 1) << " " << (indices[i+1] + 1) << " " << (indices[i+2] + 1) << "\n";
+    }
+
+    out.close();
+    std::cout << "Data saved to " << path << std::endl;
 }
 
 void keys(unsigned char key, int x, int y) 
 {
 	if(key == 'w' || key == 's' || key == 'a' || key == 'd' || key == 'q' || key == 'e') {
 		moveVertices(key, 0.025f);
+	}
+	else if(key == 't') {
+		toggleWireframe();
 	}
 	else if(key == 'l') {
 		locked = !locked;
@@ -508,14 +596,49 @@ void keys(unsigned char key, int x, int y)
 		}
 		selectedVertices.clear();
 	}
+	else if (key == 'D') {
+        for (int i : selectedVertices) {
+            vertices[i * 3] = vertices[i * 3 + 1] = vertices[i * 3 + 2] = 0.0f;
+        }
+        selectedVertices.clear();
+        glBindBuffer(GL_ARRAY_BUFFER, vertexBufferObjID);
+        glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(GLfloat), vertices.data(), GL_STATIC_DRAW);
+    }
+	else if (key == 13) {
+        saveToFile("./object.obj");
+    }
 }
 
 void specialKeys(unsigned char key, int x, int y) {
-    switch (key) {
-        case 14: // shift
+	switch (key) {
+		case GLUT_KEY_UP:
+            cameraDistance -= 0.5;
+            if (cameraDistance < 0.5)
+                cameraDistance = 0.5;
+            break;
+        case GLUT_KEY_DOWN:
+            cameraDistance += 0.5;
+            if (cameraDistance > 50.0)
+                cameraDistance = 50.0;
+            break;
+		case GLUT_KEY_LEFT:
+			currentLightingMode = (currentLightingMode + 1) % 4;
+			break;
+        case GLUT_KEY_RIGHT:
+			currentLightingMode = (currentLightingMode - 1 + 4) % 4;
+			break;
+        case 14:
             shift_down = true;
             break;
     }
+
+	vec3 cameraPosition = vec3(0, 0, cameraDistance);
+    vec3 cameraTarget = vec3(0, 0, 0);
+    vec3 upVector = vec3(0, 1, 0);
+    viewToWorld = lookAt(cameraPosition.x, cameraPosition.y, cameraPosition.z,
+                         cameraTarget.x, cameraTarget.y, cameraTarget.z,
+                         upVector.x, upVector.y, upVector.z);
+	glutPostRedisplay();
 }
 
 void specialKeysUp(unsigned char key, int x, int y) {
@@ -526,9 +649,21 @@ void specialKeysUp(unsigned char key, int x, int y) {
     }
 }
 
+
 void mousedrag(int x, int y)
 {
-	sgMouseDrag(x, y);
+    int dx = x - prevx;
+    int dy = y - prevy;
+
+    vec3 p = {float(dy), float(dx), 0.0};
+    float angle = sqrt(p.x * p.x + p.y * p.y) / 50.0f;
+
+    modelRotation = Mult(ArbRotate(p, angle), modelRotation);
+
+    prevx = x;
+    prevy = y;
+
+    glutPostRedisplay();
 }
 
 int main(int argc, char *argv[])
